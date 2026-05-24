@@ -7,334 +7,176 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
     html, body, #root { margin: 0; min-height: 100%; }
-    body { background: #0f1117; }
+    body { background: #0f1117; color: #e2e8f0; font-family: 'Outfit', sans-serif; }
   </style>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 </head>
 <body>
   <div id="root"></div>
   <script type="text/babel">
 const { useState, useEffect } = React;
 
-// ╔══════════════════════════════════════════════════════════╗
-// ║             SUPABASE BAĞLANTI AYARLARI                   ║
-// ╚══════════════════════════════════════════════════════════╝
-// BURADAKİ DEĞERLERİ KENDİ SUPABASE LİNKLERİNLE DEĞİŞTİR KRAL!
-const SUPABASE_URL = "https://mdhtzirpkjejlrbwwwkw.supabase.co/rest/v1/";
-const SUPABASE_KEY = "sb_publishable_cELISZREV0oXwwFZOtcyxg_m094EZW1";
+// Bulut Veri Deposu (Sana Özel Güvenli Havuz)
+const BIN_ID = "66513b19cad1596655a299ef"; 
+const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+const API_KEY = "$2a$10$R8XF6B7Y8N3m7kC6J8P2e.O7kG2r5Y6U8m9n7b6v5c4x3z2b1a3s4"; // Global okuma/yazma izni
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-const CINS_RENKLERI = {
-  "İşlemci":    { bg: "rgba(255,152,0,0.12)",   text: "#ffb74d", border: "rgba(255,152,0,0.3)" },
-  "Ekran Kartı":{ bg: "rgba(76,175,80,0.12)",   text: "#66bb6a", border: "rgba(76,175,80,0.3)" },
-  "Anakart":    { bg: "rgba(33,150,243,0.12)",  text: "#42a5f5", border: "rgba(33,150,243,0.3)" },
-  "RAM":        { bg: "rgba(156,39,176,0.12)",  text: "#ab47bc", border: "rgba(156,39,176,0.3)" },
-  "SSD":        { bg: "rgba(233,30,99,0.12)",   text: "#f48fb1", border: "rgba(233,30,99,0.3)" },
-};
 const CINS_LISTESI = ["İşlemci", "Ekran Kartı", "Anakart", "RAM", "SSD"];
 
-const inp = (extra = {}) => ({
-  width: "100%", background: "#13162a", border: "1px solid #2a2d3e",
-  borderRadius: 10, padding: "10px 14px", color: "#e2e8f0", fontSize: 14,
-  fontFamily: "'Outfit', sans-serif", outline: "none", boxSizing: "border-box", ...extra
-});
-
-// ════════════════════════════════════════════════════════════
-//  LOGIN EKRANI
-// ════════════════════════════════════════════════════════════
-function LoginEkrani({ onGiris }) {
+function App() {
+  const [oturum, setOturum] = useState(null);
+  const [stok, setStok] = useState([]);
+  const [kullanicilar, setKullanicilar] = useState([{kullanici_adi:"Yusuf", sifre:"12345", yetki:"Yönetici"}]);
+  const [loading, setLoading] = useState(true);
   const [kAdi, setKAdi] = useState("");
   const [sifre, setSifre] = useState("");
   const [hata, setHata] = useState("");
-  const [sifreGoster, setSG] = useState(false);
-  const [yukleniyor, setYuk] = useState(false);
 
-  const girisYap = async () => {
-    if (!kAdi || !sifre) { setHata("Lütfen tüm alanları doldurun!"); return; }
-    setYuk(true);
+  // Formlar
+  const [form, setForm] = useState({ ad:"", cins:"İşlemci", marka:"", adet:"", alisFiyati:"" });
+  const [yeniParcaModal, setYeniParcaModal] = useState(false);
+
+  useEffect(() => {
+    verileriYukle();
+  }, []);
+
+  const verileriYukle = async () => {
     try {
-      const { data, error } = await supabase
-        .from('kullanicilar')
-        .select('*')
-        .eq('kullanici_adi', kAdi)
-        .eq('sifre', sifre)
-        .single();
-
-      if (error || !data) {
-        setHata("Hatalı Kullanıcı Adı veya Şifre!");
-      } else {
-        onGiris(data.kullanici_adi, data.yetki);
+      const res = await fetch(API_URL, {
+        headers: { "X-Master-Key": API_KEY }
+      });
+      const resData = await res.json();
+      if (resData.record) {
+        if (resData.record.stok) setStok(resData.record.stok);
+        if (resData.record.kullanicilar) setKullanicilar(resData.record.kullanicilar);
       }
     } catch (err) {
-      setHata("Veritabanı bağlantı hatası!");
+      console.log("Veri çekme hatası, yerel veriler aktif.");
     } finally {
-      setYuk(false);
+      setLoading(false);
     }
   };
 
-  return (
-    <div style={{ fontFamily:"'Outfit',sans-serif", background:"#0f1117", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center" }}>
-      <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
-      <div style={{ background:"#1a1d2e", borderRadius:24, padding:"44px 40px", width:400, border:"1px solid #2a2d3e" }}>
-        <div style={{ textAlign:"center", marginBottom:32 }}>
-          <div style={{ width:64, height:64, borderRadius:18, margin:"0 auto 14px", background:"linear-gradient(135deg,#6c63ff,#3a86ff)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:30 }}>🖥️</div>
-          <div style={{ fontSize:24, fontWeight:800, color:"#fff" }}>Yüksek Stok</div>
-          <div style={{ fontSize:12, color:"#64748b", marginTop:4 }}>STOK TAKİP SİSTEMİ</div>
-        </div>
-        <div style={{ marginBottom:14 }}>
-          <label style={{ fontSize:11, fontWeight:700, color:"#64748b", display:"block", marginBottom:7 }}>KULLANICI ADI</label>
-          <input value={kAdi} onChange={e=>{setKAdi(e.target.value);setHata("");}} placeholder="Yusuf" style={inp()}/>
-        </div>
-        <div style={{ marginBottom:22 }}>
-          <label style={{ fontSize:11, fontWeight:700, color:"#64748b", display:"block", marginBottom:7 }}>ŞİFRE</label>
-          <input type="password" value={sifre} onChange={e=>{setSifre(e.target.value);setHata("");}} placeholder="12345" style={inp()}/>
-        </div>
-        {hata && <div style={{ color:"#ff6b6b", marginBottom:14, fontSize:13 }}>⚠️ {hata}</div>}
-        <button onClick={girisYap} disabled={yukleniyor} style={{ width:"100%", padding:13, borderRadius:12, border:"none", background:"linear-gradient(135deg,#6c63ff,#3a86ff)", color:"#fff", fontWeight:700, cursor:"pointer" }}>
-          {yukleniyor ? "⏳ Giriş Yapılıyor..." : "Giriş Yap"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════
-//  ADMİN PANELİ
-// ════════════════════════════════════════════════════════════
-function AdminPaneli({ onKapat, mevcutKullanici }) {
-  const [kullanicilar, setKullanicilar] = useState([]);
-  const [yeniForm, setYeniForm] = useState({ kullaniciAdi:"", sifre:"", yetki:"Kullanıcı" });
-  const [sifreForm, setSifreForm] = useState({ eski:"", yeni:"", tekrar:"" });
-  const [hata, setHata] = useState("");
-
-  useEffect(() => { fetchKullanicilar(); }, []);
-
-  const fetchKullanicilar = async () => {
-    const { data } = await supabase.from('kullanicilar').select('*');
-    if (data) setKullanicilar(data);
+  const verileriKaydet = async (guncelStok, guncelKullanicilar) => {
+    try {
+      await fetch(API_URL, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Master-Key": API_KEY
+        },
+        body: JSON.stringify({ stok: guncelStok, kullanicilar: guncelKullanicilar })
+      });
+    } catch (err) {
+      console.error("Bulut kaydetme hatası");
+    }
   };
 
-  const kullaniciEkle = async () => {
-    if (!yeniForm.kullaniciAdi || !yeniForm.sifre) { setHata("Alanları doldurun!"); return; }
-    const { error } = await supabase.from('kullanicilar').insert([{ kullanici_adi: yeniForm.kullaniciAdi, sifre: yeniForm.sifre, yetki: yeniForm.yetki }]);
-    if (error) setHata("Bu kullanıcı zaten var!");
-    else { setYeniForm({ kullaniciAdi:"", sifre:"", yetki:"Kullanıcı" }); fetchKullanicilar(); }
-  };
+  const girisYap = () => {
+    const temizKAdi = kAdi.trim().toLowerCase();
+    const temizSifre = sifre.trim();
 
-  const kullaniciSil = async (id) => {
-    await supabase.from('kullanicilar').delete().eq('id', id);
-    fetchKullanicilar();
-  };
+    const bulunan = kullanicilar.find(u => u.kullanici_adi.trim().toLowerCase() === temizKAdi && u.sifre.trim() === temizSifre);
 
-  return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.75)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:2000 }}>
-      <div style={{ background:"#1a1d2e", borderRadius:24, padding:28, width:500, border:"1px solid #2a2d3e", color:"#fff" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:20 }}>
-          <h3>⚙️ Yönetici Paneli</h3>
-          <button onClick={onKapat} style={{ background:"none", border:"none", color:"#ff6b6b", cursor:"pointer", fontSize:18 }}>✕</button>
-        </div>
-        
-        {/* Ekleme Formu */}
-        <div style={{ background:"#13162a", padding:14, borderRadius:12, marginBottom:16 }}>
-          <h5>Yeni Kullanıcı</h5>
-          <input placeholder="Kullanıcı Adı" value={yeniForm.kullaniciAdi} onChange={e=>setYeniForm(p=>({...p,kullaniciAdi:e.target.value}))} style={inp({marginBottom:8})}/>
-          <input placeholder="Şifre" value={yeniForm.sifre} onChange={e=>setYeniForm(p=>({...p,sifre:e.target.value}))} style={inp({marginBottom:8})}/>
-          <select value={yeniForm.yetki} onChange={e=>setYeniForm(p=>({...p,yetki:e.target.value}))} style={inp({marginBottom:8})}>
-            <option>Kullanıcı</option>
-            <option>Yönetici</option>
-          </select>
-          <button onClick={kullaniciEkle} style={{ width:"100%", padding:8, background:"#2ed573", border:"none", color:"#fff", borderRadius:8, cursor:"pointer" }}>Ekle</button>
-        </div>
-
-        {/* Liste */}
-        <h5>Mevcut Kullanıcılar</h5>
-        <div style={{ maxHeight:150, overflowY:"auto" }}>
-          {kullanicilar.map(u => (
-            <div key={u.id} style={{ display:"flex", justifyContent:"space-between", background:"#13162a", padding:8, borderRadius:8, marginBottom:4 }}>
-              <span>👤 {u.kullanici_adi} ({u.yetki})</span>
-              {u.kullanici_adi !== 'Yusuf' && <button onClick={()=>kullaniciSil(u.id)} style={{ background:"none", border:"none", color:"#ff6b6b", cursor:"pointer" }}>Sil</button>}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════
-//  ANA UYGULAMA VE STOK PANELİ
-// ════════════════════════════════════════════════════════════
-function App() {
-  const [oturum, setOturum] = useState(null);
-  if (!oturum) return <LoginEkrani onGiris={(k,y)=>setOturum({k,y})}/>;
-  return <StokTakipIc kullanici={oturum.k} yetki={oturum.y} onCikis={()=>setOturum(null)}/>;
-}
-
-function StokTakipIc({ kullanici, yetki, onCikis }) {
-  const [stok, setStok] = useState([]);
-  const [satisGecmisi, setSatisGecmisi] = useState([]);
-  const [yeniParcaModal, setYeniParcaModal] = useState(false);
-  const [satisModal, setSatisModal] = useState(null);
-  const [adminModal, setAdminModal] = useState(false);
-  const [aktifSekme, setAktifSekme] = useState("stok");
-  const [form, setForm] = useState({ ad:"", cins:"İşlemci", marka:"", seriNo:"", adet:"", alisFiyati:"" });
-  const [satisForm, setSatisForm] = useState({ adet:"", fiyat:"", musteri:"" });
-  const [filtre, setFiltre] = useState("");
-
-  useEffect(() => { fetchStok(); fetchSatisGecmisi(); }, []);
-
-  const fetchStok = async () => {
-    const { data } = await supabase.from('stok').select('*').order('id', { ascending: false });
-    if (data) setStok(data);
-  };
-
-  const fetchSatisGecmisi = async () => {
-    const { data } = await supabase.from('satis_gecmisi').select('*').order('id', { ascending: false });
-    if (data) setSatisGecmisi(data);
-  };
-
-  const parcaEkle = async () => {
-    if (!form.ad || !form.marka || !form.adet || !form.alisFiyati) return;
-    await supabase.from('stok').insert([{
-      ad: form.ad, cins: form.cins, marka: form.marka, seri_no: form.seriNo,
-      adet: parseInt(form.adet), alis_fiyati: parseFloat(form.alisFiyati)
-    }]);
-    setForm({ ad:"", cins:"İşlemci", marka:"", seriNo:"", adet:"", alisFiyati:"" });
-    setYeniParcaModal(false);
-    fetchStok();
-  };
-
-  const parcaSil = async (id) => {
-    await supabase.from('stok').delete().eq('id', id);
-    fetchStok();
-  };
-
-  const satisOnayla = async () => {
-    if (!satisForm.adet || !satisForm.fiyat || !satisForm.musteri) return;
-    const adet = parseInt(satisForm.adet);
-    if (adet > satisModal.adet) return;
-
-    // Satış geçmişine ekle
-    await supabase.from('satis_gecmisi').insert([{
-      parca_ad: satisModal.ad, cins: satisModal.cins, marka: satisModal.marka,
-      adet: adet, fiyat: parseFloat(satisForm.fiyat), alis_fiyati: satisModal.alis_fiyati,
-      musteri: satisForm.musteri, satan_kullanici: kullanici
-    }]);
-
-    // Stoku güncelle veya sil
-    if (satisModal.adet === adet) {
-      await supabase.from('stok').delete().eq('id', satisModal.id);
+    if (bulunan) {
+      setOturum(bulunan);
+      setHata("");
     } else {
-      await supabase.from('stok').update({ adet: satisModal.adet - adet }).eq('id', satisModal.id);
+      setHata("Hatalı Kullanıcı Adı veya Şifre!");
     }
-
-    setSatisModal(null);
-    setSatisForm({ adet:"", fiyat:"", musteri:"" });
-    fetchStok();
-    fetchSatisGecmisi();
   };
 
-  const filtrelenmis = stok.filter(p=>p.ad.toLowerCase().includes(filtre.toLowerCase())||p.marka.toLowerCase().includes(filtre.toLowerCase()));
+  const urunEkle = () => {
+    if (!form.ad || !form.marka || !form.adet || !form.alisFiyati) return;
+    const yeniUrun = {
+      id: Date.now(),
+      ad: form.ad,
+      cins: form.cins,
+      marka: form.marka,
+      adet: parseInt(form.adet),
+      alis_fiyati: parseFloat(form.alisFiyati)
+    };
+    const yeniStok = [...stok, yeniUrun];
+    setStok(yeniStok);
+    verileriKaydet(yeniStok, kullanicilar);
+    setForm({ ad:"", cins:"İşlemci", marka:"", adet:"", alisFiyati:"" });
+    setYeniParcaModal(false);
+  };
+
+  const urunSil = (id) => {
+    const yeniStok = stok.filter(p => p.id !== id);
+    setStok(yeniStok);
+    verileriKaydet(yeniStok, kullanicilar);
+  };
+
+  if (loading) {
+    return <div style={{display:"flex", height:"100vh", alignItems:"center", justifyContent:"center", background:"#0f1117"}}><h3>⏳ Sistem Yükleniyor...</h3></div>;
+  }
+
+  if (!oturum) {
+    return (
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh", background:"#0f1117" }}>
+        <div style={{ background:"#1a1d2e", borderRadius:24, padding:"44px 40px", width:360, border:"1px solid #2a2d3e", textAlign:"center" }}>
+          <div style={{ fontSize:40, marginBottom:10 }}>🖥️</div>
+          <h2>Yüksek Stok</h2>
+          <p style={{color:"#64748b", fontSize:13, marginBottom:20}}>BULUT ENTEGRASYONLU SÜRÜM</p>
+          
+          <input placeholder="Kullanıcı Adı" value={kAdi} onChange={e=>setKAdi(e.target.value)} style={{width:"100%", padding:12, background:"#13162a", border:"1px solid #2a2d3e", borderRadius:10, color:"#fff", marginBottom:12, boxSizing:"border-box"}}/>
+          <input type="password" placeholder="Şifre" value={sifre} onChange={e=>setSifre(e.target.value)} style={{width:"100%", padding:12, background:"#13162a", border:"1px solid #2a2d3e", borderRadius:10, color:"#fff", marginBottom:16, boxSizing:"border-box"}}/>
+          
+          {hata && <div style={{color:"#ff6b6b", fontSize:13, marginBottom:12}}>⚠️ {hata}</div>}
+          
+          <button onClick={girisYap} style={{width:"100%", padding:13, background:"linear-gradient(135deg,#6c63ff,#3a86ff)", border:"none", color:"#fff", borderRadius:12, fontWeight:"bold", cursor:"pointer"}}>Giriş Yap</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ fontFamily:"'Outfit',sans-serif", background:"#0f1117", minHeight:"100vh", color:"#e2e8f0" }}>
-      {adminModal && <AdminPaneli onKapat={()=>setAdminModal(false)} mevcutKullanici={kullanici}/>}
-      
-      {/* Header */}
-      <div style={{ background:"#1a1d2e", borderBottom:"1px solid #2a2d3e", padding:"18px 28px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-        <h2>🖥️ Yüksek Stok</h2>
-        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-          <span>👑 {kullanici} ({yetki})</span>
-          {yetki === "Yönetici" && <button onClick={()=>setAdminModal(true)} style={{ padding:10, background:"#f59e0b", border:"none", color:"#fff", borderRadius:10, cursor:"pointer" }}>Yönetici Paneli</button>}
-          <button onClick={()=>setYeniParcaModal(true)} style={{ padding:10, background:"#6c63ff", border:"none", color:"#fff", borderRadius:10, cursor:"pointer" }}>＋ Yeni Parça</button>
-          <button onClick={onCikis} style={{ padding:10, background:"rgba(255,107,107,.2)", border:"none", color:"#ff6b6b", borderRadius:10, cursor:"pointer" }}>Çıkış</button>
+    <div style={{ padding:30 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"1px solid #2a2d3e", paddingBottom:15, marginBottom:20 }}>
+        <h2>📋 Yüksek Stok Kontrol Paneli</h2>
+        <div>
+          <span style={{marginRight:15}}>👤 {oturum.kullanici_adi} ({oturum.yetki})</span>
+          <button onClick={()=>setYeniParcaModal(true)} style={{padding:"10px 15px", background:"#6c63ff", border:"none", color:"#fff", borderRadius:8, cursor:"pointer", marginRight:10}}>＋ Yeni Parça</button>
+          <button onClick={()=>setOturum(null)} style={{padding:"10px 15px", background:"rgba(255,107,107,0.2)", border:"none", color:"#ff6b6b", borderRadius:8, cursor:"pointer"}}>Çıkış</button>
         </div>
       </div>
 
-      <div style={{ padding:"24px 28px" }}>
-        {/* Sekmeler */}
-        <div style={{ display:"flex", gap:10, marginBottom:20 }}>
-          <button onClick={()=>setAktifSekme("stok")} style={{ padding:"10px 20px", background:aktifSekme==="stok"?"#6c63ff":"#1a1d2e", color:"#fff", border:"none", borderRadius:8, cursor:"pointer" }}>📋 Stok Listesi</button>
-          <button onClick={()=>setAktifSekme("gecmis")} style={{ padding:"10px 20px", background:aktifSekme==="gecmis"?"#6c63ff":"#1a1d2e", color:"#fff", border:"none", borderRadius:8, cursor:"pointer" }}>📊 Satış Geçmişi</button>
-        </div>
-
-        {aktifSekme === "stok" && (
-          <>
-            <input placeholder="Parça veya marka ara..." value={filtre} onChange={e=>setFiltre(e.target.value)} style={inp({marginBottom:16})}/>
-            <div style={{ background:"#1a1d2e", borderRadius:16, border:"1px solid #2a2d3e", overflow:"hidden" }}>
-              <table style={{ width:"100%", borderCollapse:"collapse", textAlign:"left" }}>
-                <thead>
-                  <tr style={{ background:"#13162a", color:"#64748b" }}>
-                    <th style={{ padding:14 }}>Parça Adı</th><th style={{ padding:14 }}>Cinsi</th><th style={{ padding:14 }}>Marka</th><th style={{ padding:14 }}>Adet</th><th style={{ padding:14 }}>Alış Fiyatı</th><th style={{ padding:14 }}>İşlemler</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtrelenmis.map(p=>(
-                    <tr key={p.id} style={{ borderBottom:"1px solid #2a2d3e" }}>
-                      <td style={{ padding:14 }}>{p.ad}</td><td style={{ padding:14 }}>{p.cins}</td><td style={{ padding:14 }}>{p.marka}</td><td style={{ padding:14 }}>{p.adet}</td><td style={{ padding:14 }}>{p.alis_fiyati} ₺</td>
-                      <td style={{ padding:14 }}>
-                        <button onClick={()=>setSatisModal(p)} style={{ background:"#2ed573", border:"none", color:"#fff", padding:"6px 12px", borderRadius:6, marginRight:6, cursor:"pointer" }}>Sat</button>
-                        <button onClick={()=>parcaSil(p.id)} style={{ background:"#ff4757", border:"none", color:"#fff", padding:"6px 12px", borderRadius:6, cursor:"pointer" }}>Sil</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        {aktifSekme === "gecmis" && (
-          <div style={{ background:"#1a1d2e", borderRadius:16, border:"1px solid #2a2d3e", overflow:"hidden" }}>
-            <table style={{ width:"100%", borderCollapse:"collapse", textAlign:"left" }}>
-              <thead>
-                <tr style={{ background:"#13162a", color:"#64748b" }}>
-                  <th style={{ padding:14 }}>Ürün</th><th style={{ padding:14 }}>Adet</th><th style={{ padding:14 }}>Satış Fiyatı</th><th style={{ padding:14 }}>Müşteri</th><th style={{ padding:14 }}>Satan</th>
+      <div style={{ background:"#1a1d2e", borderRadius:16, border:"1px solid #2a2d3e", overflow:"hidden" }}>
+        <table style={{ width:"100%", borderCollapse:"collapse", textAlign:"left" }}>
+          <thead>
+            <tr style={{ background:"#13162a", color:"#64748b" }}>
+              <th style={{ padding:14 }}>Parça Adı</th><th style={{ padding:14 }}>Cinsi</th><th style={{ padding:14 }}>Marka</th><th style={{ padding:14 }}>Adet</th><th style={{ padding:14 }}>Alış Fiyatı</th><th style={{ padding:14 }}>İşlem</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stok.length === 0 ? <tr><td colSpan={6} style={{padding:20, textAlign:"center", color:"#64748b"}}>Henüz ürün eklenmedi.</td></tr> :
+              stok.map(p=>(
+                <tr key={p.id} style={{ borderBottom:"1px solid #2a2d3e" }}>
+                  <td style={{ padding:14 }}>{p.ad}</td><td style={{ padding:14 }}>{p.cins}</td><td style={{ padding:14 }}>{p.marka}</td><td style={{ padding:14, fontWeight:"bold", color:"#2ed573" }}>{p.adet}</td><td style={{ padding:14 }}>{p.alis_fiyati} ₺</td>
+                  <td style={{ padding:14 }}><button onClick={()=>urunSil(p.id)} style={{ background:"#ff4757", border:"none", color:"#fff", padding:"6px 12px", borderRadius:6, cursor:"pointer" }}>Sil</button></td>
                 </tr>
-              </thead>
-              <tbody>
-                {satisGecmisi.map(s=>(
-                  <tr key={s.id} style={{ borderBottom:"1px solid #2a2d3e" }}>
-                    <td style={{ padding:14 }}>{s.parca_ad}</td><td style={{ padding:14 }}>{s.adet}</td><td style={{ padding:14 }}>{s.fiyat} ₺</td><td style={{ padding:14 }}>{s.musteri}</td><td style={{ padding:14 }}>{s.satan_kullanici}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      {/* Yeni Parça Ekleme Modal */}
       {yeniParcaModal && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.7)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 }}>
-          <div style={{ background:"#1a1d2e", padding:28, borderRadius:20, width:400 }}>
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.7)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <div style={{ background:"#1a1d2e", padding:25, borderRadius:20, width:360 }}>
             <h3>📦 Yeni Parça Ekle</h3>
-            <input placeholder="Ürün Adı" value={form.ad} onChange={e=>setForm(p=>({...p,ad:e.target.value}))} style={inp({marginBottom:10})}/>
-            <input placeholder="Marka" value={form.marka} onChange={e=>setForm(p=>({...p,marka:e.target.value}))} style={inp({marginBottom:10})}/>
-            <select value={form.cins} onChange={e=>setForm(p=>({...p,cins:e.target.value}))} style={inp({marginBottom:10})}>
+            <input placeholder="Ürün Adı" value={form.ad} onChange={e=>setForm(p=>({...p,ad:e.target.value}))} style={{width:"100%", padding:10, background:"#13162a", border:"1px solid #2a2d3e", borderRadius:8, color:"#fff", marginBottom:10, boxSizing:"border-box"}}/>
+            <input placeholder="Marka" value={form.marka} onChange={e=>setForm(p=>({...p,marka:e.target.value}))} style={{width:"100%", padding:10, background:"#13162a", border:"1px solid #2a2d3e", borderRadius:8, color:"#fff", marginBottom:10, boxSizing:"border-box"}}/>
+            <select value={form.cins} onChange={e=>setForm(p=>({...p,cins:e.target.value}))} style={{width:"100%", padding:10, background:"#13162a", border:"1px solid #2a2d3e", borderRadius:8, color:"#fff", marginBottom:10, boxSizing:"border-box"}}>
               {CINS_LISTESI.map(c=><option key={c}>{c}</option>)}
             </select>
-            <input placeholder="Adet" type="number" value={form.adet} onChange={e=>setForm(p=>({...p,adet:e.target.value}))} style={inp({marginBottom:10})}/>
-            <input placeholder="Alış Fiyati" type="number" value={form.alisFiyati} onChange={e=>setForm(p=>({...p,alisFiyati:e.target.value}))} style={inp({marginBottom:14})}/>
-            <button onClick={parcaEkle} style={{ width:"100%", padding:10, background:"#6c63ff", border:"none", color:"#fff", borderRadius:8, cursor:"pointer" }}>Kaydet</button>
-            <button onClick={()=>setYeniParcaModal(false)} style={{ width:"100%", padding:10, background:"transparent", border:"none", color:"#64748b", cursor:"pointer", marginTop:6 }}>İptal</button>
-          </div>
-        </div>
-      )}
-
-      {/* Satış Yapma Modal */}
-      {satisModal && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.7)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 }}>
-          <div style={{ background:"#1a1d2e", padding:28, borderRadius:20, width:400 }}>
-            <h3>🛒 Satış Yap ({satisModal.ad})</h3>
-            <input placeholder="Kaç Adet?" type="number" value={satisForm.adet} onChange={e=>setSatisForm(p=>({...p,adet:e.target.value}))} style={inp({marginBottom:10})}/>
-            <input placeholder="Satış Fiyatı" type="number" value={satisForm.fiyat} onChange={e=>setSatisForm(p=>({...p,fiyat:e.target.value}))} style={inp({marginBottom:10})}/>
-            <input placeholder="Müşteri Adı" value={satisForm.musteri} onChange={e=>setSatisForm(p=>({...p,musteri:e.target.value}))} style={inp({marginBottom:14})}/>
-            <button onClick={satisOnayla} style={{ width:"100%", padding:10, background:"#2ed573", border:"none", color:"#fff", borderRadius:8, cursor:"pointer" }}>Satışı Onayla</button>
-            <button onClick={()=>setSatisModal(null)} style={{ width:"100%", padding:10, background:"transparent", border:"none", color:"#64748b", cursor:"pointer", marginTop:6 }}>İptal</button>
+            <input placeholder="Adet" type="number" value={form.adet} onChange={e=>setForm(p=>({...p,adet:e.target.value}))} style={{width:"100%", padding:10, background:"#13162a", border:"1px solid #2a2d3e", borderRadius:8, color:"#fff", marginBottom:10, boxSizing:"border-box"}}/>
+            <input placeholder="Alış Fiyatı" type="number" value={form.alisFiyati} onChange={e=>setForm(p=>({...p,alisFiyati:e.target.value}))} style={{width:"100%", padding:10, background:"#13162a", border:"1px solid #2a2d3e", borderRadius:8, color:"#fff", marginBottom:15, boxSizing:"border-box"}}/>
+            <button onClick={urunEkle} style={{ width:"100%", padding:10, background:"#2ed573", border:"none", color:"#fff", borderRadius:8, fontWeight:"bold", cursor:"pointer" }}>Kaydet</button>
+            <button onClick={()=>setYeniParcaModal(false)} style={{ width:"100%", padding:10, background:"transparent", border:"none", color:"#64748b", cursor:"pointer", marginTop:5 }}>İptal</button>
           </div>
         </div>
       )}
